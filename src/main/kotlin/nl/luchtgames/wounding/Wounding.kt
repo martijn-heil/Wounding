@@ -20,38 +20,99 @@
 package nl.luchtgames.wounding
 
 import org.bukkit.Effect.STEP_SOUND
-import org.bukkit.Material.REDSTONE_WIRE
-import org.bukkit.Material.REDSTONE_BLOCK
+import org.bukkit.Material
+import org.bukkit.Material.*
 import org.bukkit.entity.LivingEntity
-import org.bukkit.entity.Player
 import org.bukkit.event.EventHandler
+import org.bukkit.event.EventPriority
 import org.bukkit.event.EventPriority.MONITOR
 import org.bukkit.event.Listener
 import org.bukkit.event.entity.EntityDamageEvent
+import org.bukkit.event.entity.EntityDeathEvent
+import org.bukkit.event.player.PlayerInteractAtEntityEvent
+import org.bukkit.event.player.PlayerMoveEvent
+import org.bukkit.inventory.EquipmentSlot
+import org.bukkit.inventory.ItemStack
 import org.bukkit.plugin.java.JavaPlugin
 import java.lang.Math.random
 
 class Wounding : JavaPlugin() {
+    private val wounded = HashMap<LivingEntity, Int>()
+    var LivingEntity.isWounded
+        get() = wounded.contains(this)
+        set(value) { if(value) wounded[this] = 0 else wounded.remove(this) }
+
+    var LivingEntity.bandageAttempts
+        get() = wounded[this] ?: 0
+        set(value) { if (this.isWounded) wounded[this] = value }
+
     override fun onEnable() {
         saveDefaultConfig()
-        val causes = config.getStringList("causes").map { EntityDamageEvent.DamageCause.valueOf(it) }
+        val causes = config.getStringList("wounding.causes").map { EntityDamageEvent.DamageCause.valueOf(it) }
+
         server.pluginManager.registerEvents(object : Listener {
             @EventHandler(priority = MONITOR)
             fun onPlayerHit(e: EntityDamageEvent) {
                 val entity = e.entity
-                val world = entity.world
-                if (entity is Player && causes.contains(e.cause) &&
-                        chance(config.getInt("chance"))) {
-                    bleed(entity)
+                if (entity is LivingEntity && causes.contains(e.cause) &&
+                        chance(config.getInt("wounding.chance"))) {
+                    entity.isWounded = true
                 }
             }
+
+            @EventHandler(priority = MONITOR)
+            fun onLivingEntityDeath(e: EntityDeathEvent) {
+                if (e is LivingEntity) e.isWounded = false
+            }
+
+            @EventHandler(priority = MONITOR)
+            fun onPlayerAttemptBandage(e: PlayerInteractAtEntityEvent) {
+                val target = e.rightClicked
+                if (target is LivingEntity) {
+                    val usedItem: ItemStack? = when (e.hand) {
+                        EquipmentSlot.OFF_HAND -> e.player.inventory.itemInOffHand
+                        EquipmentSlot.HAND -> e.player.inventory.itemInMainHand
+                        else -> null
+                    }
+
+                    val bandageLore = config.getString("bandage.lore")
+                    if (usedItem != null &&
+                            usedItem.type == Material.valueOf(config.getString("bandage.material")) &&
+                            usedItem.hasItemMeta() && usedItem.itemMeta.hasLore() &&
+                            bandageLore != null &&
+                            usedItem.itemMeta.lore.contains(config.getString("bandage.lore"))) {
+                        if (attemptToBandage(target)) usedItem.amount--
+                    }
+                }
+            }
+
+            @EventHandler(priority = EventPriority.MONITOR)
+            fun onPlayerMove(e: PlayerMoveEvent) {
+                var bandageAttempts = e.player.bandageAttempts - 1
+                if(bandageAttempts < 0) bandageAttempts = 0
+                e.player.bandageAttempts = bandageAttempts
+            }
         }, this)
+
+        server.scheduler.scheduleSyncRepeatingTask(this, {
+            server.worlds.forEach { it.entities.forEach { if (it is LivingEntity && it.isWounded) bleed(it) } }
+        }, 0, config.getLong("bleedInterval"))
+    }
+
+    override fun onDisable() {
+        wounded.clear()
+    }
+
+    private fun attemptToBandage(target: LivingEntity): Boolean {
+        val attempts = wounded[target]?.plus(1) ?: return false
+        if (attempts >= config.getInt("bandageClicksNeeded")) { target.isWounded = false; return true }
+        return false
     }
 }
 
-fun chance(chance: Int) = (random() * 100) < chance
+private fun chance(chance: Int) = (random() * 100) < chance
 
-fun bleed(e: LivingEntity) {
+private fun bleed(e: LivingEntity) {
     e.health -= 2
     e.world.playEffect(e.location, STEP_SOUND, REDSTONE_BLOCK)
     e.world.spawnFallingBlock(e.location, REDSTONE_WIRE, 0x00).dropItem = false

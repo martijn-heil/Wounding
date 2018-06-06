@@ -1,5 +1,26 @@
-# Chance to be wounded on a hit
-chance: 5
-causes:
-  - ""
-  - ""
+bandage:
+  # The lore entry that the lore of a bandage item should contain to be identified as a bandage
+  # Set to null for no lore requirement
+  lore: null
+
+  # The type of org.bukkit.Material that is used for bandages
+  material: "PAPER"
+
+  # Amount of clicks with a bandage to heal a wounded LivingEntity.
+  clicksNeeded: 10
+
+wounding:
+  # Chance to be wounded on a hit
+  chance: 5
+
+  # Interval in between shedding blood, in ticks, of which there (usually) are 20 in a second.
+  interval: 20
+
+  # List of valid org.bukkit.event.entity.EntityDamageEvent.DamageCause'es to become wounded.
+  causes:
+    - "BLOCK_EXPLOSION"
+    - "CUSTOM"
+    - "ENTITY_ATTACK"
+    - "ENTITY_EXPLOSION"
+    - "ENTITY_SWEEP_ATTACK"
+    - "PROJECTILE"
