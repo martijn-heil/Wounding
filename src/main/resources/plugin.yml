@@ -1,0 +1,4 @@
+name: Wounding
+version: @version@
+author: Ninjoh
+main: nl.luchtgames.wounding.Wounding
