@@ -38,16 +38,17 @@ import org.bukkit.potion.PotionEffect
 import org.bukkit.potion.PotionEffectType
 import java.lang.Math.random
 
+
+private val wounded = HashMap<LivingEntity, Int>()
+var LivingEntity.isWounded
+    get() = wounded.contains(this)
+    set(value) { if(value) wounded[this] = 0 else wounded.remove(this) }
+
+var LivingEntity.bandageAttempts
+    get() = wounded[this] ?: 0
+    set(value) { if (this.isWounded) wounded[this] = value }
+
 class Wounding : JavaPlugin() {
-    private val wounded = HashMap<LivingEntity, Int>()
-    var LivingEntity.isWounded
-        get() = wounded.contains(this)
-        set(value) { if(value) wounded[this] = 0 else wounded.remove(this) }
-
-    var LivingEntity.bandageAttempts
-        get() = wounded[this] ?: 0
-        set(value) { if (this.isWounded) wounded[this] = value }
-
     override fun onEnable() {
         saveDefaultConfig()
         val causes = config.getStringList("wounding.causes").map { EntityDamageEvent.DamageCause.valueOf(it) }
