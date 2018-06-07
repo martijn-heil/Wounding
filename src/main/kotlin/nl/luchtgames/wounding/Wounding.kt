@@ -117,7 +117,7 @@ class Wounding : JavaPlugin() {
     }
 
     private fun attemptToBandage(target: LivingEntity): Boolean {
-        val attempts = wounded[target]?.plus(1) ?: return false
+        val attempts = wounded[target]?.inc() ?: return false
         if (attempts >= config.getInt("bandage.clicksNeeded")) { target.isWounded = false; return true }
         return false
     }
