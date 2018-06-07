@@ -34,6 +34,8 @@ import org.bukkit.event.player.PlayerMoveEvent
 import org.bukkit.inventory.EquipmentSlot
 import org.bukkit.inventory.ItemStack
 import org.bukkit.plugin.java.JavaPlugin
+import org.bukkit.potion.PotionEffect
+import org.bukkit.potion.PotionEffectType
 import java.lang.Math.random
 
 class Wounding : JavaPlugin() {
@@ -88,15 +90,26 @@ class Wounding : JavaPlugin() {
 
             @EventHandler(priority = EventPriority.MONITOR)
             fun onPlayerMove(e: PlayerMoveEvent) {
-                var bandageAttempts = e.player.bandageAttempts - 1
-                if(bandageAttempts < 0) bandageAttempts = 0
-                e.player.bandageAttempts = bandageAttempts
+                e.player.bandageAttempts = 0
             }
         }, this)
 
         server.scheduler.scheduleSyncRepeatingTask(this, {
-            server.worlds.forEach { it.entities.forEach { if (it is LivingEntity && it.isWounded) bleed(it) } }
-        }, 0, config.getLong("bleedInterval"))
+            server.worlds.forEach {
+                it.entities.forEach {
+                    if (it is LivingEntity && it.isWounded) {
+                        bleed(it)
+                        it.addPotionEffect(
+                                PotionEffect(PotionEffectType.CONFUSION,
+                                        config.getInt("wounding.interval") * 2,
+                                        1,
+                                        false,
+                                        false)
+                        )
+                    }
+                }
+            }
+        }, 0, config.getLong("wounding.interval"))
     }
 
     override fun onDisable() {
@@ -105,7 +118,7 @@ class Wounding : JavaPlugin() {
 
     private fun attemptToBandage(target: LivingEntity): Boolean {
         val attempts = wounded[target]?.plus(1) ?: return false
-        if (attempts >= config.getInt("bandageClicksNeeded")) { target.isWounded = false; return true }
+        if (attempts >= config.getInt("bandage.clicksNeeded")) { target.isWounded = false; return true }
         return false
     }
 }
